@@ -1,5 +1,5 @@
 import random
-from utils import card_value, hand_value, Action
+from envs.utils import card_value, hand_value, Action
 import pandas as pd
 
 class BlackjackEnv:
