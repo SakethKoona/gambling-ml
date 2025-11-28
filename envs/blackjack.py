@@ -1,4 +1,7 @@
-{"id":"59838","variant":"standard","title":"RL-Friendly Blackjack Environment with Policies"}
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import random
 from envs.utils import card_value, hand_value, Action
 import pandas as pd
