@@ -1,3 +1,4 @@
+{"id":"59838","variant":"standard","title":"RL-Friendly Blackjack Environment with Policies"}
 import random
 from envs.utils import card_value, hand_value, Action
 import pandas as pd
@@ -50,13 +51,27 @@ class BlackjackEnv:
         can_split = int(len(hand) == 2 and hand[0] == hand[1])
         return (player_total, int(is_soft), dealer_upcard_val, can_double, can_split)
 
+    def get_valid_actions(self):
+        hand = self.player_hands[self.current_hand_idx]
+        valid = [Action.HIT, Action.STAND]
+        if len(hand) == 2:
+            valid.append(Action.DOUBLE_DOWN)
+            if hand[0] == hand[1]:
+                valid.append(Action.SPLIT)
+        return valid
+
     def step(self, action: Action):
         if self.done:
-            raise ValueError("Round already finished. Call reset().")
+            return None, self.reward, self.done, {}
 
         hand = self.player_hands[self.current_hand_idx]
         bet = self.bets[self.current_hand_idx]
 
+        # Handle invalid action gracefully
+        if action not in self.get_valid_actions():
+            self.reward = -10 * bet  # large negative reward
+            self.done = True
+            return None, self.reward, self.done, {"invalid_action": True}
 
         match action:
             case Action.HIT:
@@ -75,8 +90,6 @@ class BlackjackEnv:
                     self._play_dealer()
                     self._finalize_round()
             case Action.DOUBLE_DOWN:
-                if len(hand) != 2:
-                    raise ValueError("Double down only allowed on initial 2 cards")
                 self.bets[self.current_hand_idx] *= 2
                 hand.append(self._deal_card())
                 self.current_hand_idx += 1
@@ -85,26 +98,24 @@ class BlackjackEnv:
                     self._play_dealer()
                     self._finalize_round()
             case Action.SPLIT:
-                if len(hand) != 2 or hand[0] != hand[1]:
-                    raise ValueError("Can only split pairs")
                 card1, card2 = hand
                 self.player_hands[self.current_hand_idx] = [card1, self._deal_card()]
                 self.player_hands.insert(self.current_hand_idx + 1, [card2, self._deal_card()])
                 self.bets.insert(self.current_hand_idx + 1, bet)
             case _:
-                raise ValueError("Invalid action")
+                # Fallback in case of unexpected input
+                self.reward = -10 * bet
+                self.done = True
+                return None, self.reward, self.done, {"invalid_action": True}
 
         next_state = None if self.done else self._get_state()
-        info = {}
-        return next_state, self.reward, self.done, info
-
+        return next_state, self.reward, self.done, {}
 
     def _play_dealer(self):
         total, _ = hand_value(self.dealer_cards)
         while total < 17:
             self.dealer_cards.append(self._deal_card())
             total, _ = hand_value(self.dealer_cards)
-
 
     def _compare_hand(self, hand, bet):
         player_total, _ = hand_value(hand)
@@ -121,16 +132,13 @@ class BlackjackEnv:
         else:
             return 0
 
-
     def _calculate_total_reward(self):
         total_reward = 0
         for hand, bet in zip(self.player_hands, self.bets):
             total_reward += self._compare_hand(hand, bet)
         return total_reward
 
-
     def _finalize_round(self):
-        # Compute round reward
         self.reward = self._calculate_total_reward()
         self.total_winnings += self.reward
         self.total_bets += sum(self.bets)
@@ -143,12 +151,13 @@ class BlackjackEnv:
         else:
             self.rounds_push += 1
 
+
 # -----------------------------
 # Simple baseline policies
 # -----------------------------
 def simple_policy(state):
     player_total, is_soft, dealer_upcard, can_double, can_split = state
-    if can_split and player_total in [16, 20]:  # split 8s and Aces
+    if can_split and player_total in [16, 20]:
         return Action.SPLIT
     if player_total <= 11 and can_double:
         return Action.DOUBLE_DOWN
@@ -161,44 +170,28 @@ def simple_policy(state):
             return Action.STAND
     else:
         return Action.STAND
-    
 
 
 def stochastic_policy(state):
     player_total, is_soft, dealer_upcard, can_double, can_split = state
-    
-    # Base probabilities
-    p_hit = 0.0
-    p_stand = 0.0
 
+    p_hit, p_stand = 0.0, 0.0
     if player_total <= 11:
-        p_hit = 0.9
-        p_stand = 0.1
+        p_hit, p_stand = 0.9, 0.1
     elif 12 <= player_total <= 16:
         if dealer_upcard >= 7:
-            p_hit = 0.7
-            p_stand = 0.3
+            p_hit, p_stand = 0.7, 0.3
         else:
-            p_hit = 0.3
-            p_stand = 0.7
+            p_hit, p_stand = 0.3, 0.7
     else:
-        p_hit = 0.1
-        p_stand = 0.9
+        p_hit, p_stand = 0.1, 0.9
 
-    # Handle splits
-    if can_split and player_total in [16, 20]:  # split 8s and Aces
+    if can_split and player_total in [16, 20]:
         return Action.SPLIT
+    if can_double and player_total <= 11 and random.random() < 0.5:
+        return Action.DOUBLE_DOWN
 
-    # Handle double down
-    if can_double and player_total <= 11:
-        if random.random() < 0.5:
-            return Action.DOUBLE_DOWN
-
-    # Sample action probabilistically
-    if random.random() < p_hit:
-        return Action.HIT
-    else:
-        return Action.STAND
+    return Action.HIT if random.random() < p_hit else Action.STAND
 
 
 # -----------------------------
@@ -238,6 +231,7 @@ def generate_dataset(n_rounds=50000, seed=0):
     df = df.dropna(subset=["final_reward"])
     df["final_reward"] = df["final_reward"].astype(int)
     return df
+
 
 # -----------------------------
 # Run example
