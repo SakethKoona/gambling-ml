@@ -37,9 +37,18 @@ if __name__ == "__main__":
     parser.add_argument('--model_type', type=str, default='logistic', help='Type of model to train: logistic or random_forest')
     parser.add_argument('--n_samples', type=int, default=100000, help='Number of samples to generate for training')
     parser.add_argument('--n_decks', type=int, default=4, help='Number of decks in the Blackjack environment')
+    parser.add_argument('--policy', type=str, default='simple', help='Policy to generate training data: simple or stochastic')
     args = parser.parse_args()
 
-    model = train_supervised_model(model_type=args.model_type, n_samples=args.n_samples, policy=simple_policy)
+    policy_map = {
+        'simple': simple_policy,
+        'stochastic': stochastic_policy
+    }
+
+    if args.policy not in policy_map:
+        raise ValueError("Unsupported policy type. Choose 'simple' or 'stochastic'.")
+
+    model = train_supervised_model(model_type=args.model_type, n_samples=args.n_samples, policy=policy_map[args.policy])
     print(f"Trained {args.model_type} model on {args.n_samples} samples.")
 
     # Next, run the model through several test episodes to evaluate performance
