@@ -191,7 +191,7 @@ def stochastic_policy(state):
 
     if can_split and player_total in [16, 20]:
         return Action.SPLIT
-    if can_double and player_total <= 11 and random.random() < 0.5:
+    if can_double and player_total <= 11 and random.random() < 0.5: # 50% chance to double down when allowed and player total <= 11
         return Action.DOUBLE_DOWN
 
     return Action.HIT if random.random() < p_hit else Action.STAND
@@ -200,7 +200,7 @@ def stochastic_policy(state):
 # -----------------------------
 # Dataset generator
 # -----------------------------
-def generate_dataset(n_rounds=50000, seed=0):
+def generate_dataset(n_rounds=50000, seed=0, policy=stochastic_policy):
     random.seed(seed)
     env = BlackjackEnv(n_decks=4)
     records = []
@@ -209,7 +209,7 @@ def generate_dataset(n_rounds=50000, seed=0):
         state = env.reset()
         done = False
         while not done:
-            action = simple_policy(state)
+            action = policy(state)
             next_state, reward, done, info = env.step(action)
 
             records.append({

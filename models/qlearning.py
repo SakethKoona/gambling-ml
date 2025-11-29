@@ -6,7 +6,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import numpy as np
 import random
 from envs.utils import Action
-from envs.blackjack import BlackjackEnv  # your enhanced environment
+from envs.blackjack import BlackjackEnv 
 
 class QLearningAgent:
     def __init__(self, env, learning_rate=0.1, discount_factor=0.99, epsilon=0.1):
@@ -32,6 +32,7 @@ class QLearningAgent:
         return tuple(state)  # (player_total, is_soft, dealer_upcard, can_double, can_split)
 
     def choose_action(self, state):
+        # Use epsilon greedy for action selection
         if random.random() < self.epsilon:
             return random.choice(range(self.n_actions))
         key = self.get_state_key(state)
@@ -78,7 +79,7 @@ if __name__ == "__main__":
     print("Training Q-learning agent...")
     agent.train(episodes=10000)
 
-    # Test
+    # Test (one episode, which represents a single round of blackjack)
     state = env.reset()
     done = False
     total_reward = 0
