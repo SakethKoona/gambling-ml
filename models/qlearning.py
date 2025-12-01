@@ -45,23 +45,32 @@ class QLearningAgent:
         if key not in self.q_table:
             self.q_table[key] = np.zeros(self.n_actions)
 
-        if next_state is not None:
+        # Bellman equation: Q(s,a) = Q(s,a) + α[r + γ*max_a'Q(s',a') - Q(s,a)]
+        current_q = self.q_table[key][action]
+        
+        if done:
+            # Terminal state: no future rewards
+            target = reward
+        else:
+            # Non-terminal state: add discounted future rewards
             next_key = self.get_state_key(next_state)
             if next_key not in self.q_table:
                 self.q_table[next_key] = np.zeros(self.n_actions)
             target = reward + self.gamma * np.max(self.q_table[next_key])
-        else:
-            target = reward
-
-        self.q_table[key][action] += self.lr * (target - self.q_table[key][action])
+        
+        # Update Q-value
+        self.q_table[key][action] = current_q + self.lr * (target - current_q)
 
     def train(self, episodes=50000):
         for ep in range(episodes):
             state = self.env.reset()
             done = False
+            
             while not done:
                 action = self.choose_action(state)
                 next_state, reward, done, _ = self.env.step(Action(action))
+                
+                # Learn from this step
                 self.learn(state, action, reward, next_state, done)
                 state = next_state
 
